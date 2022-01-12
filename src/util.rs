@@ -3,11 +3,11 @@ use crate::ffi::{
     unqlite_util_load_mmaped_file, unqlite_util_random_num, unqlite_util_random_string,
     unqlite_util_release_mmaped_file,
 };
+use crate::UnQLite;
 use std::ffi::CString;
 use std::mem;
 use std::os::raw::c_void;
 use std::path::Path;
-use crate::UnQLite;
 
 /// Utility interfaces.
 pub trait Util {
@@ -25,15 +25,12 @@ pub trait Util {
 impl Util for UnQLite {
     fn random_string(&self, buf_size: u32) -> Vec<u8> {
         unsafe {
-            let mut vec: Vec<u8> = Vec::with_capacity(buf_size as usize);
-            unqlite_util_random_string(
-                self.as_raw_mut_ptr(),
-                vec.as_mut_ptr() as *mut i8,
-                buf_size,
-            )
-            .wrap()
-            .unwrap();
-            vec
+            let vec: Vec<u8> = Vec::with_capacity(buf_size as usize);
+            let z_buf = CString::new(vec).unwrap().into_raw();
+            unqlite_util_random_string(self.as_raw_mut_ptr(), z_buf, buf_size)
+                .wrap()
+                .unwrap();
+            Vec::from_raw_parts(z_buf as *mut u8, buf_size as usize, buf_size as usize)
         }
     }
 
@@ -50,9 +47,7 @@ pub fn load_mmaped_file<P: AsRef<Path>>(path: P) -> Result<Mmap> {
         let path = path.as_ref();
         let mut ptr: *mut c_void = mem::MaybeUninit::uninit().assume_init();
         let mut size: i64 = 0;
-        let cpath = CString::new(
-            path.to_str().expect("cannot convert the path to str")
-        )?;
+        let cpath = CString::new(path.to_str().expect("cannot convert the path to str"))?;
         unqlite_util_load_mmaped_file(cpath.as_ptr(), &mut ptr, &mut size)
             .wrap()
             .map(|_| Mmap {
