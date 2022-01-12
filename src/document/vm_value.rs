@@ -5,10 +5,10 @@ use crate::ffi::{
     unqlite_value_to_bool, unqlite_value_to_double, unqlite_value_to_int64,
     unqlite_value_to_string,
 };
-use std::collections::HashMap;
-use std::os::raw::{c_int, c_void};
-use std::slice;
 use crate::vars::{UNQLITE_ABORT, UNQLITE_OK};
+use std::collections::HashMap;
+use std::ffi::CStr;
+use std::os::raw::{c_int, c_void};
 
 /// Map of Values
 pub type Map = HashMap<String, Value>;
@@ -122,14 +122,23 @@ pub unsafe fn to_value(ptr: *mut unqlite_value) -> Option<Value> {
 
 unsafe fn value_to_string(ptr: *mut unqlite_value) -> Option<String> {
     let mut len: c_int = 0;
-    let cstr: *const i8 = unqlite_value_to_string(ptr, &mut len);
-    if cstr.is_null() {
-        None
-    } else {
-        let slice: &[u8] = slice::from_raw_parts(cstr as *const u8, len as usize);
-        let string = String::from_utf8_lossy(slice).to_string(); // clone bytes
-        Some(string)
-    }
+    let slice = CStr::from_ptr(unqlite_value_to_string(ptr, &mut len));
+    slice.to_str().ok().map(|s| s.to_string())
+
+    // if let Ok(n) = slice.to_str() {
+    //     return Some(String::from_utf8_lossy(slice).to_string());
+    // }
+    // None
+    // let string = String::from_utf8_lossy(slice).to_string(); // clone bytes
+    // Some(string)
+    // let cstr: *const i8 = unqlite_value_to_string(ptr, &mut len);
+    // if cstr.is_null() {
+    //     None
+    // } else {
+    //     let slice: &[u8] = slice::from_raw_parts(cstr as *const u8, len as usize);
+    //     let string = String::from_utf8_lossy(slice).to_string(); // clone bytes
+    //     Some(string)
+    // }
 }
 
 unsafe extern "C" fn array_walk(
